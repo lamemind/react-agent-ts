@@ -1,0 +1,46 @@
+{
+  "name": "@lamemind/react-agent-ts",
+  "version": "1.0.0",
+  "homepage": "https://github.com/lamemind/react-agent-ts#readme",
+  "description": "Streaming ReAct agent in typescript with multiple LLM providers",
+  "author": "lamemind",
+  "license": "ISC",
+  "type": "module",
+  "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "react",
+    "ai",
+    "agent",
+    "llm",
+    "anthropic",
+    "chatgpt",
+    "gemini",
+    "tool",
+    "fuction",
+    "calling"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lamemind/react-agent-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/lamemind/react-agent-ts/issues"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.57",
+    "zod": "^3.25.32"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
