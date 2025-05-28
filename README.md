@@ -174,17 +174,6 @@ Set callback for streaming updates during execution.
 **`dumpConversation(): void`**
 Debug method to log the complete conversation history.
 
-### Utility Functions
-
-**`systemPrompt(prompt: string)`**
-Create a system message with caching support.
-
-**`userMessage(message: string)`**
-Create a user message.
-
-**`validateAndParseInput<T>(args: unknown, schema: ZodSchema): T`**
-Validate and parse tool inputs with Zod schemas.
-
 ## 🔧 Configuration
 
 ### Model Configuration
