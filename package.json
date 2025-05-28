@@ -4,7 +4,7 @@
   "homepage": "https://github.com/lamemind/react-agent-ts#readme",
   "description": "Streaming ReAct agent in typescript with multiple LLM providers",
   "author": "lamemind",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "files": [
