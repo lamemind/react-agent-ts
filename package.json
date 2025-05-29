@@ -1,12 +1,13 @@
 {
   "name": "@lamemind/react-agent-ts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "homepage": "https://github.com/lamemind/react-agent-ts#readme",
   "description": "Streaming ReAct agent in typescript with multiple LLM providers",
   "author": "lamemind",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
