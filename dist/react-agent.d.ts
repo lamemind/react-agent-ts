@@ -1,5 +1,5 @@
 export declare class ReActAgent {
-    readonly model: any;
+    model: any;
     readonly tools: any[];
     messages: any[];
     private readonly toolsMap;
@@ -7,6 +7,7 @@ export declare class ReActAgent {
     private readonly maxIterations;
     private onMessageCallback;
     constructor(model: any, tools: any[], maxIterations?: number);
+    withStructuredOutput(schema: any): this;
     onMessage(callback: (msg: any) => void): void;
     invoke(messages: any[] | string): Promise<string | any[]>;
     /**

@@ -16,6 +16,10 @@ export class ReActAgent {
         if (tools.length > 0)
             console.log(`Tools: ${tools.map(tool => tool.name).join(", ")}`);
     }
+    withStructuredOutput(schema) {
+        this.model = this.model.withStructuredOutput(schema);
+        return this;
+    }
     onMessage(callback) {
         this.onMessageCallback = callback;
     }

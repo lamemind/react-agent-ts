@@ -5,7 +5,7 @@ const MAX_ITERATIONS = 10;
 
 export class ReActAgent {
 
-    public readonly model: any;
+    public model: any;
     public readonly tools: any[];
     public messages: any[];
     private readonly toolsMap: Record<string, any> = {};
@@ -24,6 +24,11 @@ export class ReActAgent {
 
         if (tools.length > 0)
             console.log(`Tools: ${tools.map(tool => tool.name).join(", ")}`);
+    }
+
+    public withStructuredOutput(schema: any) {
+        this.model = this.model.withStructuredOutput(schema) as any;
+        return this;
     }
 
     public onMessage(callback: (msg: any) => void) {
