@@ -11,7 +11,7 @@ export class ReActAgent {
     private readonly toolsMap: Record<string, any> = {};
     private isToolCallsComplete: boolean = false;
     private readonly maxIterations: number;
-    private onMessageCallback: null | ((msg: any) => void) = null;
+    private onMessageCallback: null | ((msg: any) => boolean | void) = null;
 
     constructor(model: any, tools: any[], maxIterations: number = MAX_ITERATIONS) {
         this.model = model.bindTools(tools);
@@ -26,7 +26,7 @@ export class ReActAgent {
             console.log(`Tools: ${tools.map(tool => tool.name).join(", ")}`);
     }
 
-    public onMessage(callback: (msg: any) => void) {
+    public onMessage(callback: (msg: any) => boolean | void) {
         this.onMessageCallback = callback;
     }
 
@@ -84,7 +84,11 @@ export class ReActAgent {
                 // console.log("\nContinuo la conversazione con risultati degli strumenti...");
                 // console.log(JSON.stringify(this.messages, null, 2));
 
-                this.onMessageCallback?.(this.messages);
+                const shouldContinue = this.onMessageCallback?.(this.messages);
+                if (shouldContinue === false) {
+                    console.log("\nConversazione interrotta dall'utente.");
+                    break;
+                }
             }
         }
 
