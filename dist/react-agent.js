@@ -16,10 +16,6 @@ export class ReActAgent {
         if (tools.length > 0)
             console.log(`Tools: ${tools.map(tool => tool.name).join(", ")}`);
     }
-    withStructuredOutput(schema) {
-        this.model = this.model.withStructuredOutput(schema);
-        return this;
-    }
     onMessage(callback) {
         this.onMessageCallback = callback;
     }
@@ -70,7 +66,11 @@ export class ReActAgent {
                 this.messages.push(...toolResults);
                 // console.log("\nContinuo la conversazione con risultati degli strumenti...");
                 // console.log(JSON.stringify(this.messages, null, 2));
-                this.onMessageCallback?.(this.messages);
+                const shouldContinue = this.onMessageCallback?.(this.messages);
+                if (shouldContinue === false) {
+                    console.log("\nConversazione interrotta dall'utente.");
+                    break;
+                }
             }
         }
         if (iterations >= this.maxIterations)
