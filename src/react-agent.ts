@@ -3,15 +3,26 @@ import { userMessage } from "./messages.js";
 
 const MAX_ITERATIONS = 10;
 
+export interface AgentState {
+    messages: any[];
+    llmResponse?: string;
+    completed: boolean;
+    iteration: number;
+}
+
 export class ReActAgent {
 
     public readonly model: any;
     public readonly tools: any[];
     public messages: any[];
     private readonly toolsMap: Record<string, any> = {};
+
+    private interrupted: boolean = false;
     private isToolCallsComplete: boolean = false;
     private readonly maxIterations: number;
-    private onMessageCallback: null | ((msg: any) => boolean | void) = null;
+
+    private onStateChangeCallback: null | ((state: AgentState) => boolean) = null;
+    private iteration: number = 0;
 
     constructor(model: any, tools: any[], maxIterations: number = MAX_ITERATIONS) {
         this.model = model.bindTools(tools);
@@ -26,26 +37,51 @@ export class ReActAgent {
             console.log(`Tools: ${tools.map(tool => tool.name).join(", ")}`);
     }
 
-    public onMessage(callback: (msg: any) => boolean | void) {
-        this.onMessageCallback = callback;
+    public onStateChange(callback: (state: AgentState) => boolean) {
+        this.onStateChangeCallback = callback;
     }
 
-    public async invoke(messages: any[] | string): Promise<string | any[]> {
+    private notifyStateChange(): void {
+        if (this.onStateChangeCallback) {
+            this.interrupted = this.onStateChangeCallback(this.saveState());
+            if (this.interrupted)
+                console.log("\nConversazione interrotta dall'utente.");
+        }
+    }
+
+    public saveState(): AgentState {
+        return {
+            messages: [...this.messages],
+            completed: this.isToolCallsComplete,
+            llmResponse: this.isToolCallsComplete ? this.extractAiTextResponse() : undefined,
+            iteration: this.iteration
+        };
+    }
+
+    public async invokeState(state: AgentState): Promise<AgentState> {
+        this.messages = [...state.messages];
+        this.isToolCallsComplete = state.completed;
+        this.iteration = state.iteration;
+
+        return this.run();
+    }
+
+    public async invokeMessage(messages: any[] | string): Promise<AgentState> {
         if (typeof messages === "string") {
             this.messages.push(userMessage(messages));
         } else {
             this.messages = messages;
         }
 
-        return await this.run();
+        return this.run();
     }
 
     /**
      * Estrae l'ultima risposta dell'assistente, concatenando i messaggi di tipo text ed escludendo il resto (tool call, ecc.)
      * @returns L'ultimo messaggio di tipo text dell'assistente
      */
-    public async extractAiTextResponse() {
-        // 1. Trova l'ultimo messaggio dell'utente, possoo essere più di uno
+    public extractAiTextResponse() {
+        // 1. Trova l'ultimo messaggio dell'utente, possono essere più di uno
         // 2. Trova tutti i messaggi role=assistant successivi
         // 3. Concatena i contenuti di tipo text di questi messaggi
 
@@ -63,40 +99,76 @@ export class ReActAgent {
         return assistantTextMessage;
     }
 
-    private async run(): Promise<string | any[]> {
+    private async run(): Promise<AgentState> {
+        this.interrupted = false;
         this.isToolCallsComplete = false;
-        let iterations = 0;
 
-        while (!this.isToolCallsComplete && iterations < this.maxIterations) {
-            iterations++;
-            // console.log(`\n--- Iterazione ${iterations} ---`);
+        while (!this.isToolCallsComplete && this.iteration < this.maxIterations) {
+            this.iteration++;
 
-            const stream = await this.model.stream(this.messages);
-            const collector = new AIMessageChunksCollector();
-            await collector.consume(stream);
-            // collector.dumpResponse();
-            const llmMessage = collector.formatMessage();
-            this.messages.push(llmMessage);
+            const tool_calls = await this.callLLM();
+            if (this.interrupted)
+                return this.saveState();
 
-            const toolResults = await this.callTools(collector.result.tool_calls);
-            if (!this.isToolCallsComplete) {
-                this.messages.push(...toolResults);
-                // console.log("\nContinuo la conversazione con risultati degli strumenti...");
-                // console.log(JSON.stringify(this.messages, null, 2));
-
-                const shouldContinue = this.onMessageCallback?.(this.messages);
-                if (shouldContinue === false) {
-                    console.log("\nConversazione interrotta dall'utente.");
-                    break;
-                }
-            }
+            await this.callTools(tool_calls);
+            if (this.interrupted)
+                return this.saveState();
         }
 
-        if (iterations >= this.maxIterations)
+        if (this.iteration >= this.maxIterations)
             console.warn(`\nRaggiunto il numero massimo di iterazioni (${this.maxIterations})`);
 
         // this.dumpConversation();
-        return this.messages[this.messages.length - 1].content;
+        return this.saveState();
+    }
+
+    private async callLLM(): Promise<AIResponseToolCall[]> {
+        const stream = await this.model.stream(this.messages);
+        const collector = new AIMessageChunksCollector();
+        await collector.consume(stream);
+        const llmMessage = collector.formatMessage();
+        this.messages.push(llmMessage);
+
+        this.notifyStateChange();
+        return collector.result.tool_calls;
+    }
+
+    private async callTools(tool_calls: AIResponseToolCall[]): Promise<void> {
+        if (!tool_calls || tool_calls.length <= 0) {
+            this.isToolCallsComplete = true;
+            return;
+        }
+
+        let counter = 1;
+        for (const call of tool_calls) {
+            console.log(`Call #${counter++} ${call.name} ${JSON.stringify(call.input, null, 2)}`);
+
+            const result = await this.executeToolCall(call);
+            const toolResult = {
+                role: "tool",
+                tool_call_id: call.id,
+                content: JSON.stringify(result)
+            };
+            this.messages.push(toolResult);
+
+            this.notifyStateChange();
+            if (this.interrupted)
+                return;
+        }
+    }
+
+    private async executeToolCall(call: any) {
+        const tool = this.toolsMap[call.name];
+        if (!tool)
+            throw new Error(`Tool non trovato: ${call.name}`);
+
+        try {
+            const result = await tool.call(call.input);
+            return result;
+        } catch (error) {
+            console.error(`Errore durante l'esecuzione del tool ${call.name}: ${error}`);
+            return `@@@@ Errore durante l'esecuzione del tool ${call.name}: ${error} @@@@`;
+        }
     }
 
     public dumpConversation() {
@@ -114,45 +186,6 @@ export class ReActAgent {
                 console.log(`[${i}] Messaggio sconosciuto: ${JSON.stringify(msg)}`);
         });
         console.log("-----------------------");
-    }
-
-    private async callTools(tool_calls: AIResponseToolCall[]) {
-        if (tool_calls && tool_calls.length > 0) {
-            // console.log(`\nTool calls richieste (${tool_calls.length}):`);
-
-            const toolResults = [];
-            for (const call of tool_calls) {
-                console.log(`Call #${toolResults.length + 1} ${call.name} ${JSON.stringify(call.input, null, 2)}`);
-                const result = await this.executeToolCall(call);
-                // console.log(`Risultato: ${JSON.stringify(result, null, 2)}`);
-
-                toolResults.push({
-                    role: "tool",
-                    tool_call_id: call.id,
-                    content: JSON.stringify(result)
-                });
-            }
-
-            return toolResults;
-        } else {
-            // console.log("\nNessun tool call richiesto, conversazione completata.");
-            this.isToolCallsComplete = true;
-            return [];
-        }
-    }
-
-    private async executeToolCall(call: any) {
-        const tool = this.toolsMap[call.name];
-        if (!tool)
-            throw new Error(`Tool non trovato: ${call.name}`);
-
-        try {
-            const result = await tool.call(call.input);
-            return result;
-        } catch (error) {
-            console.error(`Errore durante l'esecuzione del tool ${call.name}: ${error}`);
-            return `@@@@ Errore durante l'esecuzione del tool ${call.name}: ${error} @@@@`;
-        }
     }
 
 }
