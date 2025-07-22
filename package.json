@@ -1,6 +1,6 @@
 {
   "name": "@lamemind/react-agent-ts",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "homepage": "https://github.com/lamemind/react-agent-ts#readme",
   "description": "Streaming ReAct agent in typescript with multiple LLM providers",
   "author": "lamemind",
