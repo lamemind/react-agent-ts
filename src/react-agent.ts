@@ -3,6 +3,8 @@ import { userMessage } from "./messages.js";
 
 const MAX_ITERATIONS = 10;
 
+export type callbackStateChange = (state: AgentState) => Promise<boolean>;
+
 export interface AgentState {
     messages: any[];
     llmResponse?: string;
@@ -21,7 +23,7 @@ export class ReActAgent {
     private isToolCallsComplete: boolean = false;
     private readonly maxIterations: number;
 
-    private onStateChangeCallback: null | ((state: AgentState) => boolean) = null;
+    private onStateChangeCallback: null | callbackStateChange = null;
     private iteration: number = 0;
 
     constructor(model: any, tools: any[], maxIterations: number = MAX_ITERATIONS) {
@@ -37,13 +39,13 @@ export class ReActAgent {
             console.log(`Tools: ${tools.map(tool => tool.name).join(", ")}`);
     }
 
-    public onStateChange(callback: (state: AgentState) => boolean) {
+    public onStateChange(callback: callbackStateChange) {
         this.onStateChangeCallback = callback;
     }
 
-    private notifyStateChange(): void {
+    private async notifyStateChange(): Promise<void> {
         if (this.onStateChangeCallback) {
-            this.interrupted = this.onStateChangeCallback(this.saveState());
+            this.interrupted = await this.onStateChangeCallback(this.saveState());
             if (this.interrupted)
                 console.log("\nConversazione interrotta dall'utente.");
         }
@@ -129,7 +131,7 @@ export class ReActAgent {
         const llmMessage = collector.formatMessage();
         this.messages.push(llmMessage);
 
-        this.notifyStateChange();
+        await this.notifyStateChange();
         return collector.result.tool_calls;
     }
 
