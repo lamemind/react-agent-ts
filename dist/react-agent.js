@@ -21,9 +21,9 @@ export class ReActAgent {
     onStateChange(callback) {
         this.onStateChangeCallback = callback;
     }
-    notifyStateChange() {
+    async notifyStateChange() {
         if (this.onStateChangeCallback) {
-            this.interrupted = this.onStateChangeCallback(this.saveState());
+            this.interrupted = await this.onStateChangeCallback(this.saveState());
             if (this.interrupted)
                 console.log("\nConversazione interrotta dall'utente.");
         }
@@ -95,7 +95,7 @@ export class ReActAgent {
         await collector.consume(stream);
         const llmMessage = collector.formatMessage();
         this.messages.push(llmMessage);
-        this.notifyStateChange();
+        await this.notifyStateChange();
         return collector.result.tool_calls;
     }
     async callTools(tool_calls) {

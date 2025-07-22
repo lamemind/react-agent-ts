@@ -1,3 +1,4 @@
+export type callbackStateChange = (state: AgentState) => Promise<boolean>;
 export interface AgentState {
     messages: any[];
     llmResponse?: string;
@@ -15,7 +16,7 @@ export declare class ReActAgent {
     private onStateChangeCallback;
     private iteration;
     constructor(model: any, tools: any[], maxIterations?: number);
-    onStateChange(callback: (state: AgentState) => boolean): void;
+    onStateChange(callback: callbackStateChange): void;
     private notifyStateChange;
     saveState(): AgentState;
     invokeState(state: AgentState): Promise<AgentState>;
