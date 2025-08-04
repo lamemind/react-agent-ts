@@ -23,6 +23,7 @@ export class ReActAgent {
     private isToolCallsComplete: boolean = false;
     private readonly maxIterations: number;
 
+    private _duringRestore_isToolCallRequest: boolean = false;
     private onStateChangeCallback: null | callbackStateChange = null;
     private iteration: number = 0;
 
@@ -64,6 +65,12 @@ export class ReActAgent {
         this.messages = [...state.messages];
         this.isToolCallsComplete = state.completed;
         this.iteration = state.iteration;
+
+        const lastMessage = this.messages[this.messages.length - 1];
+        const lastSubMessage = lastMessage.role === 'assistant'
+            ? lastMessage.content[lastMessage.content.length - 1]
+            : null;
+        this._duringRestore_isToolCallRequest = lastSubMessage && lastSubMessage.type === 'tool_use';
 
         return this.run();
     }
@@ -108,13 +115,19 @@ export class ReActAgent {
         while (!this.isToolCallsComplete && this.iteration < this.maxIterations) {
             this.iteration++;
 
-            const tool_calls = await this.callLLM();
-            if (this.interrupted)
-                return this.saveState();
+            let tool_calls: AIResponseToolCall[] = [];
+            if (this._duringRestore_isToolCallRequest)
+                this._duringRestore_isToolCallRequest = false;
 
-            await this.callTools(tool_calls);
+            else {
+                tool_calls = await this.callLLM();
+                if (this.interrupted)
+                    break
+            }
+
+            await this.callTools(tool_calls!);
             if (this.interrupted)
-                return this.saveState();
+                break
         }
 
         if (this.iteration >= this.maxIterations)

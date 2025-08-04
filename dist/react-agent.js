@@ -6,6 +6,7 @@ export class ReActAgent {
         this.toolsMap = {};
         this.interrupted = false;
         this.isToolCallsComplete = false;
+        this._duringRestore_isToolCallRequest = false;
         this.onStateChangeCallback = null;
         this.iteration = 0;
         this.model = model.bindTools(tools);
@@ -40,6 +41,11 @@ export class ReActAgent {
         this.messages = [...state.messages];
         this.isToolCallsComplete = state.completed;
         this.iteration = state.iteration;
+        const lastMessage = this.messages[this.messages.length - 1];
+        const lastSubMessage = lastMessage.role === 'assistant'
+            ? lastMessage.content[lastMessage.content.length - 1]
+            : null;
+        this._duringRestore_isToolCallRequest = lastSubMessage && lastSubMessage.type === 'tool_use';
         return this.run();
     }
     async invokeMessage(messages) {
@@ -77,12 +83,17 @@ export class ReActAgent {
         this.isToolCallsComplete = false;
         while (!this.isToolCallsComplete && this.iteration < this.maxIterations) {
             this.iteration++;
-            const tool_calls = await this.callLLM();
-            if (this.interrupted)
-                return this.saveState();
+            let tool_calls = [];
+            if (this._duringRestore_isToolCallRequest)
+                this._duringRestore_isToolCallRequest = false;
+            else {
+                tool_calls = await this.callLLM();
+                if (this.interrupted)
+                    break;
+            }
             await this.callTools(tool_calls);
             if (this.interrupted)
-                return this.saveState();
+                break;
         }
         if (this.iteration >= this.maxIterations)
             console.warn(`\nRaggiunto il numero massimo di iterazioni (${this.maxIterations})`);

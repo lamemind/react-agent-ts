@@ -13,6 +13,7 @@ export declare class ReActAgent {
     private interrupted;
     private isToolCallsComplete;
     private readonly maxIterations;
+    private _duringRestore_isToolCallRequest;
     private onStateChangeCallback;
     private iteration;
     constructor(model: any, tools: any[], maxIterations?: number);
