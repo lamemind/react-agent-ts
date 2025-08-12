@@ -83,15 +83,14 @@ export class ReActAgent {
         this.isToolCallsComplete = false;
         while (!this.isToolCallsComplete && this.iteration < this.maxIterations) {
             this.iteration++;
-            let tool_calls = [];
             if (this._duringRestore_isToolCallRequest)
                 this._duringRestore_isToolCallRequest = false;
             else {
-                tool_calls = await this.callLLM();
+                await this.callLLM();
                 if (this.interrupted)
                     break;
             }
-            await this.callTools(tool_calls);
+            await this.callTools();
             if (this.interrupted)
                 break;
         }
@@ -107,9 +106,10 @@ export class ReActAgent {
         const llmMessage = collector.formatMessage();
         this.messages.push(llmMessage);
         await this.notifyStateChange();
-        return collector.result.tool_calls;
     }
-    async callTools(tool_calls) {
+    async callTools() {
+        const lastMessage = this.messages[this.messages.length - 1];
+        const tool_calls = lastMessage.content.filter((c) => c.type === 'tool_use');
         if (!tool_calls || tool_calls.length <= 0) {
             this.isToolCallsComplete = true;
             return;

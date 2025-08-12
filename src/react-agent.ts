@@ -115,17 +115,15 @@ export class ReActAgent {
         while (!this.isToolCallsComplete && this.iteration < this.maxIterations) {
             this.iteration++;
 
-            let tool_calls: AIResponseToolCall[] = [];
             if (this._duringRestore_isToolCallRequest)
                 this._duringRestore_isToolCallRequest = false;
-
             else {
-                tool_calls = await this.callLLM();
+                await this.callLLM();
                 if (this.interrupted)
                     break
             }
 
-            await this.callTools(tool_calls!);
+            await this.callTools();
             if (this.interrupted)
                 break
         }
@@ -137,7 +135,7 @@ export class ReActAgent {
         return this.saveState();
     }
 
-    private async callLLM(): Promise<AIResponseToolCall[]> {
+    private async callLLM(): Promise<void> {
         const stream = await this.model.stream(this.messages);
         const collector = new AIMessageChunksCollector();
         await collector.consume(stream);
@@ -145,10 +143,11 @@ export class ReActAgent {
         this.messages.push(llmMessage);
 
         await this.notifyStateChange();
-        return collector.result.tool_calls;
     }
 
-    private async callTools(tool_calls: AIResponseToolCall[]): Promise<void> {
+    private async callTools(): Promise<void> {
+        const lastMessage = this.messages[this.messages.length - 1];
+        const tool_calls: AIResponseToolCall[] = lastMessage.content.filter((c: any) => c.type === 'tool_use');
         if (!tool_calls || tool_calls.length <= 0) {
             this.isToolCallsComplete = true;
             return;
